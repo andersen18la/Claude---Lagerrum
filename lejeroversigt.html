@@ -1,0 +1,471 @@
+<title>Lejere på gården</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: ejendomsregister — overblik pr. hus øverst som en række kort, derunder et filtrerbart lejerregister. */
+:root {
+  --bg: #f6f5f0;
+  --panel: #ffffff;
+  --fg: #22271f;
+  --muted: #676d60;
+  --line: #dddcd2;
+  --accent: #3f6b3a;        /* markgrøn */
+  --accent-soft: #e4ecdf;
+  --storage: #8a5a2b;       /* træ / lade */
+  --storage-soft: #f2e7da;
+  --camp: #2f6480;          /* campingvogn */
+  --camp-soft: #dfeaf1;
+  --danger: #a33a2a;
+  --danger-soft: #f6e1dc;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-body: "Figtree", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-data: "JetBrains Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #171a15; --panel: #20241d; --fg: #e8eae2; --muted: #9ba192; --line: #343a2f;
+    --accent: #8fbf82; --accent-soft: #2a3726;
+    --storage: #d9a36f; --storage-soft: #3a2d20;
+    --camp: #7fb6d4; --camp-soft: #1f3340;
+    --danger: #e98a78; --danger-soft: #402520;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #171a15; --panel: #20241d; --fg: #e8eae2; --muted: #9ba192; --line: #343a2f;
+  --accent: #8fbf82; --accent-soft: #2a3726;
+  --storage: #d9a36f; --storage-soft: #3a2d20;
+  --camp: #7fb6d4; --camp-soft: #1f3340;
+  --danger: #e98a78; --danger-soft: #402520;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 28px 64px; display: grid; gap: 28px; }
+h1, h2 { font-family: var(--font-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: 2rem; line-height: 1.1; }
+h2 { font-size: 1.25rem; }
+.eyebrow { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; }
+.num { font-variant-numeric: tabular-nums; }
+
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+header.top p { margin: 6px 0 0; color: var(--muted); max-width: 60ch; }
+.totals { display: flex; gap: 20px; flex-wrap: wrap; }
+.total { display: grid; }
+.total b { font-family: var(--font-display); font-size: 1.6rem; line-height: 1; }
+.total span { font-size: 0.8rem; color: var(--muted); }
+
+button, .btn { font: inherit; font-weight: 600; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); padding: 8px 14px; cursor: pointer; }
+button:hover { border-color: var(--muted); }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, .site:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+button.danger { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
+button.link { border: 0; background: none; padding: 4px 6px; color: var(--accent); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Hus-oversigt */
+.sites { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+.site { text-align: left; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 8px; cursor: pointer; font-weight: 400; }
+.site.on { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.site .name { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; }
+.site .sub { font-size: 0.78rem; color: var(--muted); min-height: 1.2em; }
+.site .count { font-family: var(--font-display); font-size: 1.8rem; line-height: 1; }
+.site .split { display: flex; gap: 6px; flex-wrap: wrap; }
+
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 0.75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.chip.lager { background: var(--storage-soft); color: var(--storage); }
+.chip.camp { background: var(--camp-soft); color: var(--camp); }
+.chip.ended { background: var(--line); color: var(--muted); }
+
+/* Register */
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.toolbar .grow { flex: 1 1 220px; }
+input, select, textarea { font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; width: 100%; }
+.toolbar select { width: auto; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: var(--panel); font-weight: 500; }
+.seg button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+.tablebox { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+table { width: 100%; border-collapse: collapse; min-width: 720px; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 600; cursor: pointer; user-select: none; white-space: nowrap; }
+th[aria-sort="ascending"]::after { content: " ↑"; }
+th[aria-sort="descending"]::after { content: " ↓"; }
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr.ended td { color: var(--muted); }
+td .who { font-weight: 600; }
+td .note { font-size: 0.8rem; color: var(--muted); max-width: 32ch; }
+.phone { font-family: var(--font-data); font-size: 0.85rem; white-space: nowrap; }
+.since { font-size: 0.78rem; color: var(--muted); }
+.actions { white-space: nowrap; text-align: right; }
+
+.empty { padding: 36px 20px; text-align: center; color: var(--muted); display: grid; gap: 10px; justify-items: center; }
+.empty strong { color: var(--fg); font-family: var(--font-display); font-size: 1.15rem; }
+
+.status { font-size: 0.8rem; color: var(--muted); }
+.status.warn { color: var(--danger); }
+
+/* Formular */
+dialog { border: 1px solid var(--line); border-radius: 12px; background: var(--panel); color: var(--fg); padding: 0; width: min(560px, calc(100vw - 32px)); }
+dialog::backdrop { background: rgb(0 0 0 / 0.35); }
+dialog form { padding: 22px; display: grid; gap: 14px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 520px) { .grid2 { grid-template-columns: 1fr; } h1 { font-size: 1.6rem; } }
+label { display: grid; gap: 4px; font-size: 0.82rem; font-weight: 600; color: var(--muted); }
+.typepick { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.typepick label { flex-direction: row; display: flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 10px; color: var(--fg); cursor: pointer; }
+.typepick input { width: auto; }
+.typepick label:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); }
+.formfoot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: space-between; align-items: center; }
+.formfoot .right { display: flex; gap: 8px; margin-left: auto; }
+.confirm { background: var(--danger-soft); color: var(--danger); border-radius: 8px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; font-size: 0.88rem; }
+.err { color: var(--danger); font-size: 0.85rem; min-height: 1em; margin: 0; }
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 8px 16px; border-radius: 8px; font-weight: 600; font-size: 0.88rem; }
+@media (prefers-reduced-motion: no-preference) { .site, button { transition: border-color .15s, background .15s; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Pladsleje · lagerrum og campingvogne</div>
+      <h1>Lejere på gården</h1>
+      <p>Hvem lejer hvad, hvor de står, hvornår de startede, og hvordan du får fat i dem.</p>
+    </div>
+    <div class="totals" aria-live="polite">
+      <div class="total"><b class="num" id="t-all">0</b><span>aktive lejere</span></div>
+      <div class="total"><b class="num" id="t-lager">0</b><span>lagerrum</span></div>
+      <div class="total"><b class="num" id="t-camp">0</b><span>campingvogne</span></div>
+    </div>
+  </header>
+
+  <section aria-labelledby="h-sites" style="display:grid;gap:12px">
+    <h2 id="h-sites">Udlejningssteder</h2>
+    <div class="sites" id="sites"></div>
+  </section>
+
+  <section aria-labelledby="h-reg" style="display:grid;gap:12px">
+    <div class="toolbar">
+      <h2 id="h-reg" style="margin-right:auto">Lejerregister</h2>
+      <button class="primary" id="add">+ Ny lejer</button>
+    </div>
+    <div class="toolbar">
+      <input class="grow" id="q" type="search" placeholder="Søg navn, telefon, plads eller note" aria-label="Søg">
+      <div class="seg" role="group" aria-label="Type">
+        <button data-type="" aria-pressed="true">Alle</button>
+        <button data-type="lager" aria-pressed="false">Lagerrum</button>
+        <button data-type="camp" aria-pressed="false">Campingvogn</button>
+      </div>
+      <select id="show" aria-label="Vis">
+        <option value="active">Kun aktive</option>
+        <option value="ended">Kun ophørte</option>
+        <option value="all">Alle</option>
+      </select>
+      <button id="export">Hent som CSV</button>
+    </div>
+    <div class="tablebox">
+      <table>
+        <thead>
+          <tr>
+            <th data-sort="name">Lejer</th>
+            <th data-sort="phone">Telefon</th>
+            <th data-sort="type">Type</th>
+            <th data-sort="site">Sted</th>
+            <th data-sort="start" aria-sort="descending">Startet</th>
+            <th aria-label="Handlinger"></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" hidden>
+        <strong id="empty-title">Ingen lejere endnu</strong>
+        <span id="empty-text">Tilføj din første lejer med navn, telefon, sted og startdato.</span>
+        <button class="primary" id="add2">+ Ny lejer</button>
+      </div>
+    </div>
+    <div class="status" id="status">Indlæser …</div>
+  </section>
+</div>
+
+<dialog id="dlg" aria-labelledby="dlg-title">
+  <form id="frm" novalidate>
+    <h2 id="dlg-title">Ny lejer</h2>
+    <div class="typepick" role="radiogroup" aria-label="Hvad lejer de">
+      <label><input type="radio" name="type" id="f-type-lager" value="lager" checked> Lagerrum</label>
+      <label><input type="radio" name="type" id="f-type-camp" value="camp"> Standplads med campingvogn</label>
+    </div>
+    <label>Navn<input id="f-name" required autocomplete="off"></label>
+    <div class="grid2">
+      <label>Telefon<input id="f-phone" type="tel" inputmode="tel" autocomplete="off"></label>
+      <label>Startdato<input id="f-start" type="date" required></label>
+    </div>
+    <div class="grid2">
+      <label>Sted<select id="f-site"></select></label>
+      <label>Rum / plads nr.<input id="f-unit" placeholder="fx 3 eller B7" autocomplete="off"></label>
+    </div>
+    <div class="grid2">
+      <label>Leje pr. måned (kr.)<input id="f-rent" type="number" min="0" step="1" inputmode="numeric"></label>
+      <label>Ophørt den (tom = aktiv)<input id="f-end" type="date"></label>
+    </div>
+    <label>Note<textarea id="f-note" rows="2" placeholder="fx nummerplade, e-mail, nøgle udleveret"></textarea></label>
+    <p class="err" id="f-err"></p>
+    <div class="confirm" id="confirm" hidden>
+      <span>Slet lejeren helt? Vil du bare markere, at de er flyttet, så udfyld "Ophørt den" i stedet.</span>
+      <span style="display:flex;gap:8px"><button type="button" id="del-no">Behold</button><button type="button" class="danger" id="del-yes">Slet</button></span>
+    </div>
+    <div class="formfoot">
+      <button type="button" class="danger" id="del" hidden>Slet</button>
+      <div class="right">
+        <button type="button" id="cancel">Annuller</button>
+        <button type="submit" class="primary" id="save">Gem</button>
+      </div>
+    </div>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+  const SITES = [
+    { id: "hus1",  name: "Hus 1",  sub: "Glashuset ved kontoret" },
+    { id: "hus11", name: "Hus 11", sub: "" },
+    { id: "hus13", name: "Hus 13", sub: "" },
+    { id: "hus14", name: "Hus 14", sub: "" },
+    { id: "hus15", name: "Hus 15", sub: "" },
+    { id: "areal", name: "Udendørs areal", sub: "Campingvognspladsen" },
+  ];
+  const TYPE = { lager: "Lagerrum", camp: "Campingvogn" };
+  const COLL = "lejere";
+  const LS_KEY = "gaard-lejere";
+
+  const $ = (id) => document.getElementById(id);
+  const state = { tenants: [], site: "", type: "", show: "active", q: "", sort: "start", dir: -1, editing: null };
+  let store = null;          // { save(t), remove(id) }
+  let readOnly = false;
+
+  // ---------- Hjælpere ----------
+  const siteName = (id) => (SITES.find((s) => s.id === id) || { name: id || "—" }).name;
+  const isActive = (t) => !t.end || t.end > today();
+  function today() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+  function fmtDate(iso) {
+    if (!iso) return "—";
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString("da-DK", { day: "numeric", month: "short", year: "numeric" });
+  }
+  function duration(iso, endIso) {
+    if (!iso) return "";
+    const [y, m, d] = iso.split("-").map(Number);
+    const end = endIso ? new Date(endIso) : new Date();
+    let months = (end.getFullYear() - y) * 12 + (end.getMonth() - (m - 1));
+    if (end.getDate() < d) months--;
+    if (months < 0) return "starter senere";
+    if (months < 1) return "under 1 md.";
+    const yrs = Math.floor(months / 12), mo = months % 12;
+    const parts = [];
+    if (yrs) parts.push(yrs + " år");
+    if (mo) parts.push(mo + " md.");
+    return parts.join(" ") ;
+  }
+  function fmtPhone(p) {
+    const digits = (p || "").replace(/\D/g, "");
+    if (digits.length === 8) return digits.replace(/(\d{2})(\d{2})(\d{2})(\d{2})/, "$1 $2 $3 $4");
+    return p || "";
+  }
+  function el(tag, attrs, ...kids) {
+    const n = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs || {})) {
+      if (k === "class") n.className = v; else if (k.startsWith("on")) n.addEventListener(k.slice(2), v); else n.setAttribute(k, v);
+    }
+    for (const k of kids) if (k != null && k !== false) n.append(k);
+    return n;
+  }
+  let toastTimer;
+  function toast(msg) { const t = $("toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => (t.hidden = true), 2200); }
+  function setStatus(msg, warn) { const s = $("status"); s.textContent = msg; s.classList.toggle("warn", !!warn); }
+
+  // ---------- Visning ----------
+  function renderSites() {
+    const box = $("sites"); box.replaceChildren();
+    const active = state.tenants.filter(isActive);
+    const mk = (id, name, sub, list) => {
+      const l = list.filter((t) => t.type === "lager").length, c = list.filter((t) => t.type === "camp").length;
+      return el("button", { class: "site" + (state.site === id ? " on" : ""), "aria-pressed": String(state.site === id), onclick: () => { state.site = state.site === id ? "" : id; render(); } },
+        el("span", { class: "name" }, name),
+        el("span", { class: "sub" }, sub),
+        el("span", { class: "count num" }, String(list.length)),
+        el("span", { class: "split" },
+          l ? el("span", { class: "chip lager" }, l + " lagerrum") : null,
+          c ? el("span", { class: "chip camp" }, c + " campingvogn" + (c > 1 ? "e" : "")) : null,
+          !list.length ? el("span", { class: "sub" }, "Ingen aktive lejere") : null));
+    };
+    for (const s of SITES) box.append(mk(s.id, s.name, s.sub, active.filter((t) => t.site === s.id)));
+    $("t-all").textContent = active.length;
+    $("t-lager").textContent = active.filter((t) => t.type === "lager").length;
+    $("t-camp").textContent = active.filter((t) => t.type === "camp").length;
+  }
+
+  function filtered() {
+    const q = state.q.trim().toLowerCase();
+    let list = state.tenants.filter((t) =>
+      (!state.site || t.site === state.site) &&
+      (!state.type || t.type === state.type) &&
+      (state.show === "all" || (state.show === "active") === isActive(t)) &&
+      (!q || [t.name, t.phone, (t.phone || "").replace(/\D/g, ""), t.unit, t.note, siteName(t.site)].some((v) => (v || "").toLowerCase().includes(q))));
+    const key = { name: (t) => (t.name || "").toLowerCase(), phone: (t) => t.phone || "", type: (t) => t.type, site: (t) => SITES.findIndex((s) => s.id === t.site) + ":" + (t.unit || "").padStart(6, "0"), start: (t) => t.start || "" }[state.sort];
+    list.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0) * state.dir);
+    return list;
+  }
+
+  function renderRows() {
+    const body = $("rows"); body.replaceChildren();
+    const list = filtered();
+    for (const t of list) {
+      const active = isActive(t);
+      body.append(el("tr", { class: active ? "" : "ended" },
+        el("td", {}, el("div", { class: "who" }, t.name || "—"), t.note ? el("div", { class: "note" }, t.note) : null),
+        el("td", {}, t.phone ? el("span", { class: "phone" }, fmtPhone(t.phone)) : el("span", { class: "since" }, "mangler"),
+          t.phone ? el("button", { class: "link", title: "Kopiér nummer", "aria-label": "Kopiér telefonnummer for " + t.name, onclick: (e) => copy(t.phone, e.currentTarget) }, "Kopiér") : null),
+        el("td", {}, el("span", { class: "chip " + t.type }, TYPE[t.type] || t.type), !active ? el("div", { class: "since" }, "Ophørt " + fmtDate(t.end)) : null),
+        el("td", {}, siteName(t.site), t.unit ? el("div", { class: "since" }, (t.type === "camp" ? "Plads " : "Rum ") + t.unit) : null),
+        el("td", { class: "num" }, fmtDate(t.start), el("div", { class: "since" }, duration(t.start, active ? null : t.end))),
+        el("td", { class: "actions" }, readOnly ? null : el("button", { class: "link", onclick: () => openForm(t) }, "Rediger"))));
+    }
+    const none = !list.length;
+    $("empty").hidden = !none;
+    if (none) {
+      const anyAtAll = state.tenants.length > 0;
+      $("empty-title").textContent = anyAtAll ? "Ingen lejere matcher" : "Ingen lejere endnu";
+      $("empty-text").textContent = anyAtAll ? "Prøv et andet sted, en anden type eller en anden søgning." : "Tilføj din første lejer med navn, telefon, sted og startdato. Hvert hus ovenfor tæller op, efterhånden som du tilføjer lejere.";
+      $("add2").hidden = anyAtAll || readOnly;
+    }
+    document.querySelectorAll("th[data-sort]").forEach((th) => th.setAttribute("aria-sort", th.dataset.sort === state.sort ? (state.dir > 0 ? "ascending" : "descending") : "none"));
+  }
+
+  function render() { renderSites(); renderRows(); }
+
+  async function copy(text, btn) {
+    try { await navigator.clipboard.writeText(text); toast("Nummer kopieret"); }
+    catch { const r = document.createRange(); r.selectNodeContents(btn.previousSibling); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast("Nummeret er markeret — kopiér det selv"); }
+  }
+
+  // ---------- Formular ----------
+  const siteSel = $("f-site");
+  for (const s of SITES) siteSel.append(el("option", { value: s.id }, s.name + (s.sub ? " — " + s.sub : "")));
+
+  function openForm(t) {
+    state.editing = t || null;
+    $("dlg-title").textContent = t ? "Rediger lejer" : "Ny lejer";
+    $("f-type-" + (t?.type || state.type || "lager")).checked = true;
+    $("f-name").value = t?.name || "";
+    $("f-phone").value = t?.phone || "";
+    $("f-start").value = t?.start || today();
+    $("f-site").value = t?.site || state.site || SITES[0].id;
+    $("f-unit").value = t?.unit || "";
+    $("f-rent").value = t?.rent ?? "";
+    $("f-end").value = t?.end || "";
+    $("f-note").value = t?.note || "";
+    $("f-err").textContent = "";
+    $("del").hidden = !t; $("confirm").hidden = true;
+    $("dlg").showModal();
+    $("f-name").focus();
+  }
+  $("add").onclick = () => openForm(); $("add2").onclick = () => openForm();
+  $("cancel").onclick = () => $("dlg").close();
+  $("del").onclick = () => { $("confirm").hidden = false; };
+  $("del-no").onclick = () => { $("confirm").hidden = true; };
+  $("del-yes").onclick = async () => {
+    const t = state.editing; if (!t) return;
+    try { await store.remove(t.id); $("dlg").close(); toast(t.name + " er slettet"); }
+    catch (e) { $("f-err").textContent = "Kunne ikke slette: " + (e?.message || e); }
+  };
+  $("frm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("f-name").value.trim(), start = $("f-start").value;
+    if (!name) { $("f-err").textContent = "Skriv lejerens navn."; $("f-name").focus(); return; }
+    if (!start) { $("f-err").textContent = "Vælg hvornår lejemålet startede."; $("f-start").focus(); return; }
+    const end = $("f-end").value;
+    if (end && end < start) { $("f-err").textContent = "Ophørsdatoen ligger før startdatoen."; $("f-end").focus(); return; }
+    const rentRaw = $("f-rent").value;
+    const t = {
+      id: state.editing?.id || "l" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      type: document.querySelector('input[name="type"]:checked').value,
+      name, phone: $("f-phone").value.trim(), start, end: end || "",
+      site: $("f-site").value, unit: $("f-unit").value.trim(),
+      rent: rentRaw === "" ? null : Number(rentRaw), note: $("f-note").value.trim(),
+      updatedAt: new Date().toISOString(),
+    };
+    $("save").disabled = true;
+    try { await store.save(t); $("dlg").close(); toast(state.editing ? "Ændringer gemt" : name + " er tilføjet"); }
+    catch (err) { $("f-err").textContent = "Kunne ikke gemme: " + (err?.message || err) + ". Prøv igen."; }
+    finally { $("save").disabled = false; }
+  });
+
+  // ---------- Filtre ----------
+  $("q").addEventListener("input", (e) => { state.q = e.target.value; renderRows(); });
+  $("show").addEventListener("change", (e) => { state.show = e.target.value; renderRows(); });
+  document.querySelectorAll(".seg button").forEach((b) => b.addEventListener("click", () => {
+    state.type = b.dataset.type;
+    document.querySelectorAll(".seg button").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    renderRows();
+  }));
+  document.querySelectorAll("th[data-sort]").forEach((th) => th.addEventListener("click", () => {
+    if (state.sort === th.dataset.sort) state.dir *= -1; else { state.sort = th.dataset.sort; state.dir = th.dataset.sort === "start" ? -1 : 1; }
+    renderRows();
+  }));
+
+  // ---------- CSV ----------
+  function csv() {
+    const esc = (v) => { const s = v == null ? "" : String(v); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+    const head = ["Navn", "Telefon", "Type", "Sted", "Rum/plads", "Startdato", "Ophørt", "Leje pr. md.", "Note"];
+    const lines = filtered().map((t) => [t.name, fmtPhone(t.phone), TYPE[t.type], siteName(t.site), t.unit, t.start, t.end, t.rent ?? "", t.note].map(esc).join(";"));
+    return "﻿" + [head.join(";"), ...lines].join("\r\n");
+  }
+  $("export").addEventListener("click", async () => {
+    const dl = await downloadsP;
+    if (dl) {
+      try { await dl.save({ filename: "lejere-" + today() + ".csv", data: new Blob([csv()], { type: "text/csv" }) }); toast("CSV-fil klar"); }
+      catch (e) { if (e?.code !== "cancelled" && e?.code !== "declined") toast("Filen blev ikke gemt"); }
+    } else {
+      try { const a = el("a", { href: URL.createObjectURL(new Blob([csv()], { type: "text/csv" })), download: "lejere-" + today() + ".csv" }); a.click(); } catch { toast("Download er ikke muligt her"); }
+    }
+  });
+
+  // ---------- Lagring ----------
+  const use = (name) => (window.claude && typeof window.claude.use === "function" ? window.claude.use(name).catch(() => null) : Promise.resolve(null));
+  const downloadsP = use("downloads");
+
+  function useLocal(reason) {
+    const load = () => { try { return JSON.parse(localStorage.getItem(LS_KEY) || "[]"); } catch { return []; } };
+    const persist = () => { try { localStorage.setItem(LS_KEY, JSON.stringify(state.tenants)); } catch {} };
+    state.tenants = load();
+    store = {
+      async save(t) { const i = state.tenants.findIndex((x) => x.id === t.id); if (i >= 0) state.tenants[i] = t; else state.tenants.push(t); persist(); render(); },
+      async remove(id) { state.tenants = state.tenants.filter((x) => x.id !== id); persist(); render(); },
+    };
+    setStatus(reason, true);
+    render();
+  }
+
+  async function boot() {
+    render();
+    const db = await use("db");
+    if (!db) { useLocal("Gemmes kun i denne browser. Brug \"Hent som CSV\" jævnligt som sikkerhedskopi."); return; }
+    const coll = db.collection(COLL);
+    store = {
+      save: (t) => coll.doc(t.id).set(t),
+      remove: (id) => coll.doc(id).delete(),
+    };
+    const user = await use("user");
+    try { if (user && user.canEdit && user.canEdit() === false && !(user.isOwner && user.isOwner())) readOnly = true; } catch {}
+    $("add").hidden = readOnly;
+    coll.onSnapshot((snap) => {
+      state.tenants = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+      setStatus(readOnly ? "Du kan se registret, men ikke ændre det." : "Gemt sikkert — ændringer ses med det samme på alle dine enheder.");
+      render();
+    }, (err) => setStatus("Registret kunne ikke hentes (" + (err?.message || err?.code) + "). Genindlæs siden.", true));
+  }
+  boot();
+})();
+</script>
